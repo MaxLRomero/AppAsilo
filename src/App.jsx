@@ -3,9 +3,10 @@ import {
   Camera, Mic, Heart, Home, User, Settings, PlayCircle, 
   CheckCircle, XCircle, MessageCircle, Clock, ChevronLeft, 
   Plus, LogOut, Users, UserPlus, ArrowRight, Grid, Image as ImageIcon,
-  Bell, Star, Activity, Upload, Loader, Key, Lock
+  Bell, Star, Activity, Upload, Loader, Key, Lock, RefreshCw
 } from 'lucide-react';
 
+// --- CONFIGURACIÓN DE CONEXIÓN AWS ---
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
@@ -15,6 +16,8 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
     primary: "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-blue-200",
     senior: "bg-white border-2 border-emerald-100 text-slate-800 hover:border-emerald-500 hover:bg-emerald-50 text-xl shadow-sm",
     seniorPrimary: "bg-emerald-600 text-white text-xl shadow-emerald-200",
+    danger: "bg-red-50 text-red-600 border border-red-100",
+    ghost: "bg-transparent shadow-none text-slate-500 hover:bg-slate-100"
   };
   return <button onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`} {...props}>{children}</button>;
 };
@@ -38,7 +41,7 @@ const shuffleArray = (array) => {
   return newArray;
 };
 
-// --- PANTALLAS ---
+// --- PANTALLAS DE AUTENTICACIÓN ---
 
 const RegisterScreen = ({ onRegister, onBack }) => {
   const [loading, setLoading] = useState(false);
@@ -94,7 +97,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
   const [role, setRole] = useState(null);
   const [val, setVal] = useState('');
   const [familyCode, setFamilyCode] = useState('');
-  const [password, setPassword] = useState(''); // NUEVO CAMPO
+  const [password, setPassword] = useState(''); 
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -104,16 +107,31 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
 
     const payload = role === 'senior' 
         ? { role, credential: val, familyCode } 
-        : { role, credential: val, password }; // Enviamos password
+        : { role, credential: val, password }; 
+
+    console.log("🚀 INTENTANDO LOGIN...", payload); 
 
     try {
       const res = await fetch(`${API_URL}/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (data.success) onLogin(data.user);
-      else setErr(data.message || 'Credenciales incorrectas');
-    } catch (error) { setErr('Error de conexión'); } 
+      console.log("📡 RESPUESTA SERVIDOR:", data); 
+
+      if (data.success) {
+        const cleanUser = {
+            ...data.user,
+            FamilyId: data.user.FamilyId || data.user.familyId,
+            UserId: data.user.UserId || data.user.userId || data.user.id,
+            Name: data.user.Name || data.user.name,
+            Role: data.user.Role || data.user.role
+        };
+        onLogin(cleanUser);
+      } else setErr(data.message || 'Credenciales incorrectas');
+    } catch (error) { 
+        console.error("❌ ERROR DE RED:", error);
+        setErr('Error de conexión con ' + API_URL); 
+    } 
     finally { setLoading(false); }
   };
 
@@ -124,6 +142,12 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
       <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mb-8 shadow-2xl mx-auto"><Heart size={48} className="text-white fill-white"/></div>
       <h1 className="text-4xl font-black text-white mb-2">Memoria<span className="text-blue-400">Viva</span></h1>
       <p className="text-slate-400 mb-10">Conectando generaciones</p>
+      
+      {/* INDICADOR VISUAL DE VERSIÓN */}
+      <div className="bg-red-500 text-white font-bold px-4 py-2 rounded-full mb-8 animate-pulse">
+        ⚠️ VERSIÓN DE PRUEBA V2 ⚠️
+      </div>
+
       <div className="w-full max-w-sm space-y-4">
         <button onClick={() => setRole('senior')} className="w-full bg-emerald-50 text-emerald-900 p-6 rounded-3xl flex items-center gap-4 hover:scale-105 transition-all shadow-xl"><User size={32} className="text-emerald-800"/> <span className="font-bold text-xl">Soy el Abuelo</span></button>
         <button onClick={() => setRole('family')} className="w-full bg-slate-800 text-white p-6 rounded-3xl flex items-center gap-4 border border-slate-700"><Users size={32} className="text-blue-400"/> <span className="font-bold text-xl">Soy Familiar</span></button>
@@ -162,18 +186,12 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
             />
           </div>
 
-          {/* CAMPO DE CONTRASEÑA (Solo para Familiar) */}
           {role === 'family' && (
              <div>
                 <label className="text-xs font-bold text-slate-400 ml-2 uppercase">Contraseña</label>
                 <div className="relative">
                     <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
-                    <input 
-                        type="password" 
-                        className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-12 text-lg outline-none focus:border-blue-500"
-                        placeholder="••••••••"
-                        value={password} onChange={e => setPassword(e.target.value)}
-                    />
+                    <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-12 text-lg outline-none focus:border-blue-500" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
                 </div>
             </div>
           )}
@@ -187,7 +205,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
 };
 
 // --- VISTA ABUELO ---
-const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading }) => {
+const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, refresh }) => {
   const [activeMemory, setActiveMemory] = useState(null);
   const [puzzleState, setPuzzleState] = useState({ pieces: [], solved: false, selected: null });
   const [feedback, setFeedback] = useState(null);
@@ -228,7 +246,10 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading }) => {
       <div className="flex flex-col h-full bg-amber-50">
         <header className="bg-emerald-600 text-white p-6 rounded-b-[2rem] shadow-lg flex justify-between items-center sticky top-0 z-10">
           <div><h1 className="text-3xl font-bold">¡Hola, {user.Name?.split(' ')[0]}! 👋</h1><p className="opacity-90">Tienes {pending.length} actividades</p></div>
-          <button onClick={onLogout} className="bg-emerald-700 p-3 rounded-xl hover:bg-emerald-800 shadow-inner"><LogOut size={24}/></button>
+          <div className="flex gap-2">
+            <button onClick={refresh} className="bg-emerald-700 p-3 rounded-xl hover:bg-emerald-800 shadow-inner"><RefreshCw size={24}/></button>
+            <button onClick={onLogout} className="bg-emerald-700 p-3 rounded-xl hover:bg-emerald-800 shadow-inner"><LogOut size={24}/></button>
+          </div>
         </header>
         <main className="p-6 space-y-4 overflow-y-auto flex-1">
           {loading ? <Loader className="animate-spin mx-auto mt-10 text-emerald-600"/> : pending.length === 0 ? (
@@ -300,7 +321,6 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
   
-  // Form states
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -318,7 +338,10 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
   const handleAdd = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    await onAddMemory({
+    const fId = user.FamilyId || user.familyId;
+    const uId = user.UserId || user.userId;
+
+    const payload = {
       type: formType, title, 
       imageUrl: imgUrl || 'https://images.unsplash.com/photo-1511895426328-dc8714191300',
       question: formType === 'quiz' ? question : null,
@@ -327,17 +350,31 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
       pieces: formType === 'puzzle' ? 4 : null,
       prompt: formType === 'diary' ? question : null,
       familyMessage: msg,
-      familyId: user.FamilyId, 
-      creatorId: user.UserId
-    });
-    setSubmitting(false); setTab('feed');
-    setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl('');
+      familyId: fId, 
+      creatorId: uId
+    };
+
+    try {
+        console.log("Enviando actividad:", payload);
+        const res = await fetch(`${API_URL}/memories`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+        if(result.success) {
+            setTab('feed');
+            onAddMemory(payload); // Trigger reload
+            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl('');
+        } else {
+            alert("Error al crear: " + result.message);
+        }
+    } catch (err) { alert("Error de conexión"); } 
+    finally { setSubmitting(false); }
   };
 
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans text-slate-800">
       <header className="bg-white px-6 py-4 shadow-sm flex justify-between items-center sticky top-0 z-20">
-        <div className="flex items-center gap-3"><div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">{user.Name?.[0]}</div><div><p className="font-bold">{user.Name}</p><p className="text-xs text-slate-500">{user.RelationshipToSenior}</p></div></div>
+        <div className="flex items-center gap-3"><div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">{user.Name?.[0] || user.name?.[0]}</div><div><p className="font-bold">{user.Name || user.name}</p><p className="text-xs text-slate-500">{user.RelationshipToSenior || user.relationshipToSenior}</p></div></div>
         <div className="flex gap-4 items-center">
             <div className="relative"><Bell size={24} className="text-slate-400" />{notifications.length > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white w-4 h-4 rounded-full text-[10px] flex items-center justify-center animate-bounce">{notifications.length}</span>}</div>
             <button onClick={onLogout}><LogOut size={24} className="text-slate-400"/></button>
@@ -402,12 +439,16 @@ export default function MemoriaVivaApp() {
   const [notifications, setNotifications] = useState([]);
 
   const fetchMemories = async (familyId) => {
+    if(!familyId) return;
     setLoadingMemories(true);
+    console.log("📥 Fetching memories for:", familyId);
     try {
       const res = await fetch(`${API_URL}/memories/${familyId}`);
       const data = await res.json();
+      console.log("📦 Memorias recibidas:", data);
       if(Array.isArray(data)) setMemories(data);
-    } catch (err) { console.error(err); } 
+      else console.error("Formato inválido:", data);
+    } catch (err) { console.error("Fetch Error:", err); } 
     finally { setLoadingMemories(false); }
   };
 
@@ -419,27 +460,24 @@ export default function MemoriaVivaApp() {
       } catch (err) { console.error(err); }
   }
 
-  const handleLogin = (u) => { setUser(u); setRegistering(false); if(u.FamilyId) { fetchMemories(u.FamilyId); fetchNotifications(u.FamilyId); } };
+  const handleLogin = (u) => { 
+    setUser(u); 
+    setRegistering(false); 
+    const fId = u.FamilyId || u.familyId;
+    if(fId) { 
+      fetchMemories(fId); 
+      fetchNotifications(fId); 
+    } 
+  };
 
   const handleUpdate = async (id, changes) => {
     setMemories(prev => prev.map(m => m.id === id ? {...m, ...changes} : m));
     if (changes.completed) await fetch(`${API_URL}/memories/${id}/complete`, { method: 'PATCH' });
   };
 
-  const handleAdd = async (data) => {
-    // data contiene: type, title, imageUrl, question...
-    const payload = { ...data, familyId: user.FamilyId, creatorId: user.UserId };
-    try {
-      const res = await fetch(`${API_URL}/memories`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      const result = await res.json();
-      if(result.success) {
-        fetchMemories(user.FamilyId);
-      } else {
-        alert("Error al crear: " + result.error);
-      }
-    } catch (err) { alert("Error de conexión"); }
+  const handleAdd = (payload) => {
+      const fId = user.FamilyId || user.familyId;
+      if(fId) fetchMemories(fId);
   };
 
   if (registering) return <RegisterScreen onRegister={handleLogin} onBack={() => setRegistering(false)}/>;
@@ -447,8 +485,8 @@ export default function MemoriaVivaApp() {
 
   return (
     <div className="w-full h-screen max-w-md mx-auto bg-slate-50 shadow-2xl overflow-hidden font-sans">
-      {user.Role === 'senior' ? (
-        <SeniorView user={user} memories={memories} onUpdateMemory={handleUpdate} onLogout={() => setUser(null)} loading={loadingMemories}/>
+      {user.Role === 'senior' || user.role === 'senior' ? (
+        <SeniorView user={user} memories={memories} onUpdateMemory={handleUpdate} onLogout={() => setUser(null)} loading={loadingMemories} refresh={() => fetchMemories(user.FamilyId || user.familyId)}/>
       ) : (
         <FamilyView user={user} memories={memories} notifications={notifications} onAddMemory={handleAdd} onLogout={() => setUser(null)} loading={loadingMemories}/>
       )}
