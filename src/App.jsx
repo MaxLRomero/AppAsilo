@@ -200,6 +200,8 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
         <button onClick={onGoToRegister} className="mt-10 text-slate-400 text-sm flex gap-2 items-center justify-center hover:text-white transition-colors">
           <UserPlus size={16}/> ¿Nueva familia? Crea una cuenta
         </button>
+        
+        <p className="text-slate-600 text-xs mt-8">v1.0.1 - Conectado a AWS</p>
       </div>
     </div>
   );
