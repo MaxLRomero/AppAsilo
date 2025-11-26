@@ -3,7 +3,7 @@ import {
   Camera, Mic, Heart, Home, User, Settings, PlayCircle, 
   CheckCircle, XCircle, MessageCircle, Clock, ChevronLeft, 
   Plus, LogOut, Users, UserPlus, ArrowRight, Grid, Image as ImageIcon,
-  Bell, Star, Activity, Upload, Loader, Key, Lock, RefreshCw
+  Bell, Star, Activity, Upload, Loader, Key, Lock, RefreshCw, AlertTriangle
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
@@ -109,16 +109,14 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
         ? { role, credential: val, familyCode } 
         : { role, credential: val, password }; 
 
-    console.log("🚀 INTENTANDO LOGIN...", payload); 
-
     try {
       const res = await fetch(`${API_URL}/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await res.json();
-      console.log("📡 RESPUESTA SERVIDOR:", data); 
 
       if (data.success) {
+        // Normalizar claves del usuario (por si vienen en mayúsculas/minúsculas)
         const cleanUser = {
             ...data.user,
             FamilyId: data.user.FamilyId || data.user.familyId,
@@ -129,8 +127,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
         onLogin(cleanUser);
       } else setErr(data.message || 'Credenciales incorrectas');
     } catch (error) { 
-        console.error("❌ ERROR DE RED:", error);
-        setErr('Error de conexión con ' + API_URL); 
+        setErr('Error de conexión con el servidor. Revisa "Contenido Inseguro" en el navegador.'); 
     } 
     finally { setLoading(false); }
   };
@@ -143,11 +140,6 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
       <h1 className="text-4xl font-black text-white mb-2">Memoria<span className="text-blue-400">Viva</span></h1>
       <p className="text-slate-400 mb-10">Conectando generaciones</p>
       
-      {/* INDICADOR VISUAL DE VERSIÓN */}
-      <div className="bg-red-500 text-white font-bold px-4 py-2 rounded-full mb-8 animate-pulse">
-        ⚠️ VERSIÓN DE PRUEBA V2 ⚠️
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         <button onClick={() => setRole('senior')} className="w-full bg-emerald-50 text-emerald-900 p-6 rounded-3xl flex items-center gap-4 hover:scale-105 transition-all shadow-xl"><User size={32} className="text-emerald-800"/> <span className="font-bold text-xl">Soy el Abuelo</span></button>
         <button onClick={() => setRole('family')} className="w-full bg-slate-800 text-white p-6 rounded-3xl flex items-center gap-4 border border-slate-700"><Users size={32} className="text-blue-400"/> <span className="font-bold text-xl">Soy Familiar</span></button>
@@ -164,7 +156,6 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
           <h3 className="text-2xl font-bold text-slate-800">{role === 'senior' ? 'Acceso Abuelo' : 'Bienvenido'}</h3>
           <p className="text-slate-500">{role === 'senior' ? 'Usa tu Código y PIN' : 'Ingresa tus datos'}</p>
         </div>
-        
         <form onSubmit={handleLogin} className="space-y-4">
           {role === 'senior' && (
             <div>
@@ -175,7 +166,6 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 </div>
             </div>
           )}
-
           <div>
             <label className="text-xs font-bold text-slate-400 ml-2 uppercase">{role === 'senior' ? 'PIN Personal' : 'Correo Electrónico'}</label>
             <input 
@@ -185,7 +175,6 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 value={val} onChange={e => setVal(e.target.value)}
             />
           </div>
-
           {role === 'family' && (
              <div>
                 <label className="text-xs font-bold text-slate-400 ml-2 uppercase">Contraseña</label>
@@ -195,7 +184,6 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 </div>
             </div>
           )}
-
           {err && <div className="text-red-500 text-center text-sm font-bold bg-red-50 p-3 rounded-xl"><XCircle size={16} className="inline mr-2"/> {err}</div>}
           <Button type="submit" disabled={loading} variant={role === 'senior' ? 'seniorPrimary' : 'primary'}>{loading ? 'Entrando...' : 'Entrar'}</Button>
         </form>
@@ -205,7 +193,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
 };
 
 // --- VISTA ABUELO ---
-const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, refresh }) => {
+const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, refresh }) => {
   const [activeMemory, setActiveMemory] = useState(null);
   const [puzzleState, setPuzzleState] = useState({ pieces: [], solved: false, selected: null });
   const [feedback, setFeedback] = useState(null);
@@ -241,7 +229,12 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, refresh
   };
 
   if (!activeMemory) {
-    const pending = memories.filter(m => !m.completed);
+    // FILTRADO CLAVE: Solo muestra tareas que NO están completadas Y que están asignadas a este user ID.
+    const pending = memories.filter(m => 
+        !m.completed && 
+        ((m.targetUserId || m.TargetUserId) === user.UserId)
+    );
+
     return (
       <div className="flex flex-col h-full bg-amber-50">
         <header className="bg-emerald-600 text-white p-6 rounded-b-[2rem] shadow-lg flex justify-between items-center sticky top-0 z-10">
@@ -252,7 +245,17 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, refresh
           </div>
         </header>
         <main className="p-6 space-y-4 overflow-y-auto flex-1">
-          {loading ? <Loader className="animate-spin mx-auto mt-10 text-emerald-600"/> : pending.length === 0 ? (
+          {/* ERROR VISIBLE */}
+          {error && (
+            <div className="bg-red-100 border-l-4 border-red-500 p-4 rounded-r-xl mb-4">
+                <div className="flex gap-2 text-red-700 font-bold"><AlertTriangle/> Error de conexión</div>
+                <p className="text-red-600 text-sm">{error}</p>
+                <button onClick={refresh} className="mt-2 text-sm underline text-red-800">Reintentar</button>
+            </div>
+          )}
+
+          {loading ? <div className="flex flex-col items-center justify-center mt-20 gap-4"><Loader className="animate-spin text-emerald-600" size={48}/><p className="text-slate-500">Cargando actividades...</p></div> 
+          : pending.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60"><Heart size={80} className="mb-4"/><p>¡Todo listo por hoy!</p></div>
           ) : pending.map(m => (
             <button key={m.id} onClick={() => { setActiveMemory(m); if(m.type === 'puzzle') initPuzzle(); }} 
@@ -355,7 +358,6 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     };
 
     try {
-        console.log("Enviando actividad:", payload);
         const res = await fetch(`${API_URL}/memories`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
@@ -437,19 +439,21 @@ export default function MemoriaVivaApp() {
   const [memories, setMemories] = useState([]);
   const [loadingMemories, setLoadingMemories] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [errorMsg, setErrorMsg] = useState(null);
 
   const fetchMemories = async (familyId) => {
     if(!familyId) return;
     setLoadingMemories(true);
-    console.log("📥 Fetching memories for:", familyId);
+    setErrorMsg(null);
     try {
       const res = await fetch(`${API_URL}/memories/${familyId}`);
+      if(!res.ok) throw new Error('Error del servidor (' + res.status + ')');
       const data = await res.json();
-      console.log("📦 Memorias recibidas:", data);
       if(Array.isArray(data)) setMemories(data);
-      else console.error("Formato inválido:", data);
-    } catch (err) { console.error("Fetch Error:", err); } 
-    finally { setLoadingMemories(false); }
+    } catch (err) { 
+      setErrorMsg('No se pudieron descargar las actividades. Revisa tu conexión.');
+      console.error("Fetch Error:", err); 
+    } finally { setLoadingMemories(false); }
   };
 
   const fetchNotifications = async (familyId) => {
@@ -486,7 +490,15 @@ export default function MemoriaVivaApp() {
   return (
     <div className="w-full h-screen max-w-md mx-auto bg-slate-50 shadow-2xl overflow-hidden font-sans">
       {user.Role === 'senior' || user.role === 'senior' ? (
-        <SeniorView user={user} memories={memories} onUpdateMemory={handleUpdate} onLogout={() => setUser(null)} loading={loadingMemories} refresh={() => fetchMemories(user.FamilyId || user.familyId)}/>
+        <SeniorView 
+          user={user} 
+          memories={memories} 
+          onUpdateMemory={handleUpdate} 
+          onLogout={() => setUser(null)} 
+          loading={loadingMemories} 
+          error={errorMsg}
+          refresh={() => fetchMemories(user.FamilyId || user.familyId)}
+        />
       ) : (
         <FamilyView user={user} memories={memories} notifications={notifications} onAddMemory={handleAdd} onLogout={() => setUser(null)} loading={loadingMemories}/>
       )}
