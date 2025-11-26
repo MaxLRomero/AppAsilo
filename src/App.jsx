@@ -477,10 +477,12 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     }
   };
 
-  const handleAdd = async (e) => {
+const handleAdd = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    await onAddMemory({
+    
+    // Datos a enviar
+    const payload = {
       type: formType,
       title, 
       imageUrl: imgUrl || 'https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1000&auto=format&fit=crop',
@@ -489,11 +491,37 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
       correctAnswer: formType === 'quiz' ? answer : null,
       pieces: formType === 'puzzle' ? 4 : null,
       prompt: formType === 'diary' ? question : null,
-      familyMessage: msg
-    });
-    setSubmitting(false);
-    setTab('feed');
-    setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl('');
+      familyMessage: msg,
+      familyId: user.FamilyId, // Asegúrate que estos campos existan en tu usuario
+      creatorId: user.UserId
+    };
+
+    try {
+      console.log("Enviando datos:", payload); // Para ver en consola qué se envía
+
+      const res = await fetch(`${API_URL}/memories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const result = await res.json();
+      
+      if(result.success) {
+        alert("¡Actividad creada con éxito!"); // Confirmación visual
+        onAddMemory(payload); // Actualizar lista localmente
+        setTab('feed');
+        // Limpiar formulario
+        setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl('');
+      } else {
+        alert("Error del servidor: " + (result.message || result.error));
+      }
+    } catch (err) {
+      console.error("Error creando memoria:", err);
+      alert("Error de conexión: " + err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const myMemories = memories;
