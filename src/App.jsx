@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
-// ¡IMPORTANTE! Reemplaza la IP con la tuya (http://TU_IP_PUBLICA:5000/api)
+// ¡IMPORTANTE! Reemplaza la IP con la tuya (http://TU_IP_PUBLICA_AQUI:5000/api)
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
@@ -232,10 +232,10 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
   if (!activeMemory) {
     const userId = user.UserId || user.userId;
     
-    // FILTRADO CLAVE: Filtra por pendiente, ID de usuario y que tenga una URL de imagen válida.
+    // FILTRADO CLAVE: Solo muestra tareas pendientes, con imagen válida Y asignadas a este abuelo.
     const pending = memories.filter(m => 
         !m.completed && 
-        (m.imageUrl) && // Debe tener URL o Base64
+        (m.imageUrl) && // Debe tener una URL válida (ya sea S3 o Fallback)
         ((m.targetUserId || m.TargetUserId) === userId) // Debe ser asignado a este abuelo
     );
 
@@ -363,11 +363,11 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     if (isFileUpload) {
       formData.append('imageFile', file); // El backend espera 'imageFile'
     } else {
-      // Si no hay archivo, usamos la URL de fallback y se lo decimos al backend
+      // Si no hay archivo, usamos la URL de fallback (la necesita el backend)
       formData.append('imageUrl', 'https://placehold.co/500x300/CCCCCC/000000?text=Sin+Foto');
     }
 
-    // 3. Adjuntar datos del Quiz/Diario (deben ir como JSON.stringify para manejar strings y objetos)
+    // 3. Adjuntar datos del Quiz/Diario (JSON.stringify)
     if (formType === 'quiz') {
       const options = ['1990', '2000', answer].sort(()=>Math.random()-0.5);
       formData.append('question', question);
@@ -381,14 +381,14 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     try {
         const res = await fetch(`${API_URL}/memories`, {
             method: 'POST', 
-            // ¡IMPORTANTE! No definimos 'Content-Type': El navegador lo hace automáticamente para FormData
+            // NO definir Content-Type, el navegador lo hace por FormData
             body: formData 
         });
         const result = await res.json();
         if(result.success) {
             setTab('feed');
             onAddMemory(payload); // Trigger reload
-            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl(''); setFile(null); // Limpiar
+            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setFile(null); setImgUrl('');// Limpiar
         } else {
             alert("Error al crear: " + (result.message || result.error));
         }
@@ -485,7 +485,7 @@ export default function MemoriaVivaApp() {
       try {
           const res = await fetch(`${API_URL}/notifications/${familyId}`);
           const data = await res.json();
-          if(Array.isArray(data)) setNotifications(data);
+          if(ArrayOf(data)) setNotifications(data);
       } catch (err) { console.error(err); }
   }
 
