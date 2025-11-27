@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
+// ¡IMPORTANTE! Reemplaza la IP con la tuya (http://TU_IP_PUBLICA:5000/api)
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
@@ -229,10 +230,13 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
   };
 
   if (!activeMemory) {
-    // FILTRADO CLAVE: Solo muestra tareas que NO están completadas Y que están asignadas a este user ID.
+    const userId = user.UserId || user.userId;
+    
+    // FILTRADO CLAVE: Filtra por pendiente, ID de usuario y que tenga una URL de imagen válida.
     const pending = memories.filter(m => 
         !m.completed && 
-        ((m.targetUserId || m.TargetUserId) === user.UserId)
+        (m.imageUrl) && // Debe tener URL o Base64
+        ((m.targetUserId || m.TargetUserId) === userId) // Debe ser asignado a este abuelo
     );
 
     return (
@@ -320,7 +324,8 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
 const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, loading }) => {
   const [tab, setTab] = useState('feed');
   const [formType, setFormType] = useState('quiz'); 
-  const [imgUrl, setImgUrl] = useState('');
+  const [file, setFile] = useState(null); // ALMACENA EL OBJETO FILE
+  const [imgUrl, setImgUrl] = useState(''); // PARA PREVISUALIZAR
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -330,11 +335,12 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
   const [msg, setMsg] = useState('');
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile); // Guarda el objeto File
       const reader = new FileReader();
-      reader.onloadend = () => setImgUrl(reader.result);
-      reader.readAsDataURL(file);
+      reader.onloadend = () => setImgUrl(reader.result); // Base64 para previsualización
+      reader.readAsDataURL(selectedFile);
     }
   };
 
@@ -343,33 +349,52 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     setSubmitting(true);
     const fId = user.FamilyId || user.familyId;
     const uId = user.UserId || user.userId;
+    const isFileUpload = file !== null;
 
-    const payload = {
-      type: formType, title, 
-      imageUrl: imgUrl || 'https://images.unsplash.com/photo-1511895426328-dc8714191300',
-      question: formType === 'quiz' ? question : null,
-      options: formType === 'quiz' ? ['1990', '2000', answer].sort(()=>Math.random()-0.5) : null,
-      correctAnswer: formType === 'quiz' ? answer : null,
-      pieces: formType === 'puzzle' ? 4 : null,
-      prompt: formType === 'diary' ? question : null,
-      familyMessage: msg,
-      familyId: fId, 
-      creatorId: uId
-    };
+    // 1. Crear FormData para el envío de archivos
+    const formData = new FormData();
+    formData.append('familyId', fId);
+    formData.append('creatorId', uId);
+    formData.append('type', formType);
+    formData.append('title', title);
+    formData.append('familyMessage', msg);
+
+    // 2. Adjuntar archivo o URL de fallback
+    if (isFileUpload) {
+      formData.append('imageFile', file); // El backend espera 'imageFile'
+    } else {
+      // Si no hay archivo, usamos la URL de fallback y se lo decimos al backend
+      formData.append('imageUrl', 'https://placehold.co/500x300/CCCCCC/000000?text=Sin+Foto');
+    }
+
+    // 3. Adjuntar datos del Quiz/Diario (deben ir como JSON.stringify para manejar strings y objetos)
+    if (formType === 'quiz') {
+      const options = ['1990', '2000', answer].sort(()=>Math.random()-0.5);
+      formData.append('question', question);
+      formData.append('correctAnswer', answer);
+      formData.append('options', JSON.stringify(options)); // El backend parsea esto
+    }
+    if (formType === 'diary') {
+      formData.append('prompt', question);
+    }
 
     try {
         const res = await fetch(`${API_URL}/memories`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+            method: 'POST', 
+            // ¡IMPORTANTE! No definimos 'Content-Type': El navegador lo hace automáticamente para FormData
+            body: formData 
         });
         const result = await res.json();
         if(result.success) {
             setTab('feed');
             onAddMemory(payload); // Trigger reload
-            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl('');
+            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setImgUrl(''); setFile(null); // Limpiar
         } else {
-            alert("Error al crear: " + result.message);
+            alert("Error al crear: " + (result.message || result.error));
         }
-    } catch (err) { alert("Error de conexión"); } 
+    } catch (err) { 
+        alert("Error de conexión al subir la actividad."); 
+    } 
     finally { setSubmitting(false); }
   };
 
