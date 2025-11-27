@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
-// Versión: v1.1 - S3 Ready
-// ¡IMPORTANTE! Reemplaza la IP con la tuya (http://TU_IP_PUBLICA_AQUI:5000/api)
+// Reemplaza con tu IP real si cambia
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
@@ -233,12 +232,12 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
   if (!activeMemory) {
     const userId = user.UserId || user.userId;
     
-    // FILTRADO CLAVE: Solo muestra tareas pendientes, con imagen válida Y asignadas a este abuelo.
-    const pending = memories.filter(m => 
-        !m.completed && 
-        (m.imageUrl) && // Debe tener una URL válida (ya sea S3 o Fallback)
-        ((m.targetUserId || m.TargetUserId) === userId) // Debe ser asignado a este abuelo
-    );
+    // FILTRO MEJORADO: Muestra tareas asignadas O tareas sin asignar de la familia (retrocompatibilidad)
+    const pending = memories.filter(m => {
+        const isForMe = (m.targetUserId || m.TargetUserId) === userId;
+        const isLegacy = !(m.targetUserId || m.TargetUserId); // Si es null, es antigua, la mostramos por si acaso
+        return !m.completed && (isForMe || isLegacy) && (m.imageUrl);
+    });
 
     return (
       <div className="flex flex-col h-full bg-amber-50">
