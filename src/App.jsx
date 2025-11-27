@@ -104,6 +104,22 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    
+    // --- VALIDACIÓN DE CAMPOS VACÍOS ---
+    if (!val.trim()) {
+        setErr(role === 'senior' ? 'Ingresa tu PIN' : 'Ingresa tu correo');
+        return;
+    }
+    if (role === 'senior' && !familyCode.trim()) {
+        setErr('Ingresa el código de familia');
+        return;
+    }
+    if (role === 'family' && !password.trim()) {
+        setErr('Ingresa tu contraseña');
+        return;
+    }
+    // ------------------------------------
+
     setLoading(true); setErr('');
 
     const payload = role === 'senior' 
