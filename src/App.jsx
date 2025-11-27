@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
-// Reemplaza con tu IP real si cambia
+// Reemplaza con tu IP pública actual si cambia al reiniciar la máquina
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
@@ -117,7 +117,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
       const data = await res.json();
 
       if (data.success) {
-        // Normalizar claves del usuario (por si vienen en mayúsculas/minúsculas)
+        // Normalizar claves del usuario por si la DB las devuelve distinto
         const cleanUser = {
             ...data.user,
             FamilyId: data.user.FamilyId || data.user.familyId,
@@ -157,6 +157,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
           <h3 className="text-2xl font-bold text-slate-800">{role === 'senior' ? 'Acceso Abuelo' : 'Bienvenido'}</h3>
           <p className="text-slate-500">{role === 'senior' ? 'Usa tu Código y PIN' : 'Ingresa tus datos'}</p>
         </div>
+        
         <form onSubmit={handleLogin} className="space-y-4">
           {role === 'senior' && (
             <div>
@@ -232,12 +233,13 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
   if (!activeMemory) {
     const userId = user.UserId || user.userId;
     
-    // FILTRO MEJORADO: Muestra tareas asignadas O tareas sin asignar de la familia (retrocompatibilidad)
-    const pending = memories.filter(m => {
-        const isForMe = (m.targetUserId || m.TargetUserId) === userId;
-        const isLegacy = !(m.targetUserId || m.TargetUserId); // Si es null, es antigua, la mostramos por si acaso
-        return !m.completed && (isForMe || isLegacy) && (m.imageUrl);
-    });
+    // FILTRADO: Tareas pendientes Y asignadas a ESTE usuario.
+    // Si 'targetUserId' es null (actividades viejas), las mostramos también por si acaso.
+    const pending = memories.filter(m => 
+        !m.completed && 
+        (m.imageUrl) && 
+        ((m.targetUserId === userId) || (m.TargetUserId === userId) || (m.targetUserId === null))
+    );
 
     return (
       <div className="flex flex-col h-full bg-amber-50">
@@ -324,8 +326,8 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
 const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, loading }) => {
   const [tab, setTab] = useState('feed');
   const [formType, setFormType] = useState('quiz'); 
-  const [file, setFile] = useState(null); // ALMACENA EL OBJETO FILE
-  const [imgUrl, setImgUrl] = useState(''); // PARA PREVISUALIZAR
+  const [file, setFile] = useState(null); 
+  const [imgUrl, setImgUrl] = useState(''); 
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
   
@@ -337,9 +339,9 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      setFile(selectedFile); // Guarda el objeto File
+      setFile(selectedFile); 
       const reader = new FileReader();
-      reader.onloadend = () => setImgUrl(reader.result); // Base64 para previsualización
+      reader.onloadend = () => setImgUrl(reader.result); 
       reader.readAsDataURL(selectedFile);
     }
   };
@@ -351,7 +353,6 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     const uId = user.UserId || user.userId;
     const isFileUpload = file !== null;
 
-    // 1. Crear FormData para el envío de archivos
     const formData = new FormData();
     formData.append('familyId', fId);
     formData.append('creatorId', uId);
@@ -359,20 +360,17 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     formData.append('title', title);
     formData.append('familyMessage', msg);
 
-    // 2. Adjuntar archivo o URL de fallback
     if (isFileUpload) {
-      formData.append('imageFile', file); // El backend espera 'imageFile'
+      formData.append('imageFile', file); 
     } else {
-      // Si no hay archivo, usamos la URL de fallback (la necesita el backend)
       formData.append('imageUrl', 'https://placehold.co/500x300/CCCCCC/000000?text=Sin+Foto');
     }
 
-    // 3. Adjuntar datos del Quiz/Diario (JSON.stringify)
     if (formType === 'quiz') {
       const options = ['1990', '2000', answer].sort(()=>Math.random()-0.5);
       formData.append('question', question);
       formData.append('correctAnswer', answer);
-      formData.append('options', JSON.stringify(options)); // El backend parsea esto
+      formData.append('options', JSON.stringify(options)); 
     }
     if (formType === 'diary') {
       formData.append('prompt', question);
@@ -381,14 +379,13 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
     try {
         const res = await fetch(`${API_URL}/memories`, {
             method: 'POST', 
-            // NO definir Content-Type, el navegador lo hace por FormData
             body: formData 
         });
         const result = await res.json();
         if(result.success) {
             setTab('feed');
-            onAddMemory({}); // Trigger reload
-            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setFile(null); setImgUrl('');// Limpiar
+            onAddMemory({}); 
+            setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setFile(null); setImgUrl('');
         } else {
             alert("Error al crear: " + (result.message || result.error));
         }
