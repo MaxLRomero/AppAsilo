@@ -184,6 +184,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 </div>
             </div>
           )}
+
           <div>
             <label className="text-xs font-bold text-slate-400 ml-2 uppercase">{role === 'senior' ? 'PIN Personal' : 'Correo Electrónico'}</label>
             <input 
@@ -193,6 +194,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 value={val} onChange={e => setVal(e.target.value)}
             />
           </div>
+
           {role === 'family' && (
              <div>
                 <label className="text-xs font-bold text-slate-400 ml-2 uppercase">Contraseña</label>
@@ -202,6 +204,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
                 </div>
             </div>
           )}
+
           {err && <div className="text-red-500 text-center text-sm font-bold bg-red-50 p-3 rounded-xl"><XCircle size={16} className="inline mr-2"/> {err}</div>}
           <Button type="submit" disabled={loading} variant={role === 'senior' ? 'seniorPrimary' : 'primary'}>{loading ? 'Entrando...' : 'Entrar'}</Button>
         </form>
@@ -249,18 +252,29 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
   if (!activeMemory) {
     const userId = user.UserId || user.userId;
     
-    // FILTRADO: Tareas pendientes Y asignadas a ESTE usuario.
-    // Si 'targetUserId' es null (actividades viejas), las mostramos también por si acaso.
-    const pending = memories.filter(m => 
-        !m.completed && 
-        (m.imageUrl) && 
-        ((m.targetUserId === userId) || (m.TargetUserId === userId) || (m.targetUserId === null))
-    );
+    // FILTRO MEJORADO: Muestra tareas asignadas O tareas sin asignar de la familia (retrocompatibilidad)
+    const pending = memories.filter(m => {
+        // 1. Debe estar pendiente (no completado)
+        if (m.completed) return false;
+        
+        // 2. Chequeo de asignación
+        const isForMe = (m.targetUserId || m.TargetUserId) === userId;
+        const isLegacy = !(m.targetUserId || m.TargetUserId); // Si no tiene dueño, muéstralo también (Legacy)
+        
+        // 3. Retornar si cumple (ignorando si tiene imagen o no por ahora para que veas algo)
+        return isForMe || isLegacy;
+    });
+
+    // Nombre seguro (fallback si viene nulo)
+    const displayName = (user.Name || user.name || "Abuelo").split(' ')[0];
 
     return (
       <div className="flex flex-col h-full bg-amber-50">
         <header className="bg-emerald-600 text-white p-6 rounded-b-[2rem] shadow-lg flex justify-between items-center sticky top-0 z-10">
-          <div><h1 className="text-3xl font-bold">¡Hola, {user.Name?.split(' ')[0]}! 👋</h1><p className="opacity-90">Tienes {pending.length} actividades</p></div>
+          <div>
+              <h1 className="text-3xl font-bold">¡Hola, {displayName}! 👋</h1>
+              <p className="opacity-90">Tienes {pending.length} actividades</p>
+          </div>
           <div className="flex gap-2">
             <button onClick={refresh} className="bg-emerald-700 p-3 rounded-xl hover:bg-emerald-800 shadow-inner"><RefreshCw size={24}/></button>
             <button onClick={onLogout} className="bg-emerald-700 p-3 rounded-xl hover:bg-emerald-800 shadow-inner"><LogOut size={24}/></button>
@@ -282,7 +296,8 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
           ) : pending.map(m => (
             <button key={m.id} onClick={() => { setActiveMemory(m); if(m.type === 'puzzle') initPuzzle(); }} 
               className="w-full bg-white p-5 rounded-3xl shadow-sm border-b-4 border-slate-200 flex items-center gap-5 active:scale-95 text-left">
-              <img src={m.imageUrl} className="w-24 h-24 rounded-2xl object-cover bg-slate-200" alt="thumb"/>
+              {/* FALLBACK DE IMAGEN SI NO EXISTE */}
+              <img src={m.imageUrl || 'https://placehold.co/150?text=Sin+Foto'} className="w-24 h-24 rounded-2xl object-cover bg-slate-200" alt="thumb"/>
               <div className="flex-1"><h3 className="font-bold text-2xl text-slate-800">{m.title}</h3></div>
               <PlayCircle size={40} className="text-emerald-500"/>
             </button>
@@ -325,7 +340,7 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
     const options = activeMemory.options || ['1998', '2015', activeMemory.correctAnswer];
     return (
       <div className="flex flex-col h-full bg-amber-50">
-        <div className="h-[40%] relative"><img src={activeMemory.imageUrl} className="w-full h-full object-cover"/><button onClick={() => setActiveMemory(null)} className="absolute top-4 left-4 p-4 bg-white/90 rounded-full shadow-lg"><ChevronLeft size={28}/></button><div className="absolute inset-0 bg-black/40 flex items-end p-6"><h2 className="text-white text-3xl font-bold">{activeMemory.question}</h2></div></div>
+        <div className="h-[40%] relative"><img src={activeMemory.imageUrl || 'https://placehold.co/500?text=Sin+Foto'} className="w-full h-full object-cover"/><button onClick={() => setActiveMemory(null)} className="absolute top-4 left-4 p-4 bg-white/90 rounded-full shadow-lg"><ChevronLeft size={28}/></button><div className="absolute inset-0 bg-black/40 flex items-end p-6"><h2 className="text-white text-3xl font-bold">{activeMemory.question}</h2></div></div>
         <div className="flex-1 bg-white -mt-8 rounded-t-[2.5rem] p-6 shadow-2xl relative z-10 flex flex-col justify-center gap-4">
           {options.map((opt, i) => (
             <Button key={i} variant="senior" onClick={() => { if(opt === activeMemory.correctAnswer) triggerSuccess(); else alert('Inténtalo de nuevo'); }}>{opt}</Button>
