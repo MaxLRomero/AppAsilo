@@ -7,15 +7,16 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
+// Reemplaza con tu IP pública actual si cambia
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
 // --- COMPONENTES UI ---
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled, ...props }) => {
-  const baseStyle = "w-full py-5 rounded-3xl font-bold text-xl transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyle = "w-full py-4 rounded-2xl font-bold transition-all transform active:scale-95 shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
     primary: "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-blue-200",
     senior: "bg-white border-2 border-emerald-100 text-slate-800 hover:border-emerald-500 hover:bg-emerald-50 text-xl shadow-sm",
-    seniorPrimary: "bg-emerald-600 text-white text-2xl shadow-emerald-200", // Botones más grandes para el abuelo
+    seniorPrimary: "bg-emerald-600 text-white text-xl shadow-emerald-200",
     danger: "bg-red-50 text-red-600 border border-red-100",
     ghost: "bg-transparent shadow-none text-slate-500 hover:bg-slate-100"
   };
@@ -41,8 +42,7 @@ const shuffleArray = (array) => {
   return newArray;
 };
 
-// --- PANTALLAS DE AUTENTICACIÓN (Login y Registro) ---
-// (Se mantienen igual que la versión funcional anterior)
+// --- PANTALLAS DE AUTENTICACIÓN ---
 
 const RegisterScreen = ({ onRegister, onBack }) => {
   const [loading, setLoading] = useState(false);
@@ -104,18 +104,23 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    
     if (!val.trim()) { setErr(role === 'senior' ? 'Ingresa tu PIN' : 'Ingresa tu correo'); return; }
     if (role === 'senior' && !familyCode.trim()) { setErr('Ingresa el código de familia'); return; }
     if (role === 'family' && !password.trim()) { setErr('Ingresa tu contraseña'); return; }
 
     setLoading(true); setErr('');
-    const payload = role === 'senior' ? { role, credential: val, familyCode } : { role, credential: val, password }; 
+
+    const payload = role === 'senior' 
+        ? { role, credential: val, familyCode } 
+        : { role, credential: val, password }; 
 
     try {
       const res = await fetch(`${API_URL}/login`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await res.json();
+
       if (data.success) {
         const cleanUser = {
             ...data.user,
@@ -126,7 +131,9 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
         };
         onLogin(cleanUser);
       } else setErr(data.message || 'Credenciales incorrectas');
-    } catch (error) { setErr('Error de conexión.'); } 
+    } catch (error) { 
+        setErr('Error de conexión con el servidor. Revisa "Contenido Inseguro" en el navegador.'); 
+    } 
     finally { setLoading(false); }
   };
 
@@ -137,6 +144,7 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
       <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mb-8 shadow-2xl mx-auto"><Heart size={48} className="text-white fill-white"/></div>
       <h1 className="text-4xl font-black text-white mb-2">Memoria<span className="text-blue-400">Viva</span></h1>
       <p className="text-slate-400 mb-10">Conectando generaciones</p>
+      
       <div className="w-full max-w-sm space-y-4">
         <button onClick={() => setRole('senior')} className="w-full bg-emerald-50 text-emerald-900 p-6 rounded-3xl flex items-center gap-4 hover:scale-105 transition-all shadow-xl"><User size={32} className="text-emerald-800"/> <span className="font-bold text-xl">Soy el Abuelo</span></button>
         <button onClick={() => setRole('family')} className="w-full bg-slate-800 text-white p-6 rounded-3xl flex items-center gap-4 border border-slate-700"><Users size={32} className="text-blue-400"/> <span className="font-bold text-xl">Soy Familiar</span></button>
@@ -153,24 +161,39 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
           <h3 className="text-2xl font-bold text-slate-800">{role === 'senior' ? 'Acceso Abuelo' : 'Bienvenido'}</h3>
           <p className="text-slate-500">{role === 'senior' ? 'Usa tu Código y PIN' : 'Ingresa tus datos'}</p>
         </div>
+        
         <form onSubmit={handleLogin} className="space-y-4">
           {role === 'senior' && (
             <div>
                 <label className="text-xs font-bold text-slate-400 ml-2 uppercase">Código de Familia</label>
-                <input type="text" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 text-lg font-mono uppercase focus:border-emerald-500" placeholder="Ej. FAM-8821" value={familyCode} onChange={e => setFamilyCode(e.target.value.toUpperCase())} />
+                <div className="relative">
+                    <Key size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                    <input type="text" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-12 text-lg font-mono uppercase focus:border-emerald-500" placeholder="Ej. FAM-8821" value={familyCode} onChange={e => setFamilyCode(e.target.value.toUpperCase())} />
+                </div>
             </div>
           )}
+
           <div>
             <label className="text-xs font-bold text-slate-400 ml-2 uppercase">{role === 'senior' ? 'PIN Personal' : 'Correo Electrónico'}</label>
-            <input type={role === 'senior' ? "tel" : "email"} maxLength={role === 'senior' ? 4 : 50} className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 text-lg focus:border-blue-500" placeholder={role === 'senior' ? "••••" : "correo@ejemplo.com"} value={val} onChange={e => setVal(e.target.value)} />
+            <input 
+                type={role === 'senior' ? "tel" : "email"} maxLength={role === 'senior' ? 4 : 50}
+                className={`w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-5 text-center text-2xl outline-none focus:border-blue-500 ${role === 'senior' ? 'tracking-[1em] font-bold' : 'tracking-normal text-base'}`}
+                placeholder={role === 'senior' ? "••••" : "correo@ejemplo.com"}
+                value={val} onChange={e => setVal(e.target.value)}
+            />
           </div>
+
           {role === 'family' && (
              <div>
                 <label className="text-xs font-bold text-slate-400 ml-2 uppercase">Contraseña</label>
-                <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 text-lg focus:border-blue-500" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                <div className="relative">
+                    <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/>
+                    <input type="password" className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 pl-12 text-lg outline-none focus:border-blue-500" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                </div>
             </div>
           )}
-          {err && <div className="text-red-500 text-center text-sm font-bold bg-red-50 p-3 rounded-xl">{err}</div>}
+
+          {err && <div className="text-red-500 text-center text-sm font-bold bg-red-50 p-3 rounded-xl"><XCircle size={16} className="inline mr-2"/> {err}</div>}
           <Button type="submit" disabled={loading} variant={role === 'senior' ? 'seniorPrimary' : 'primary'}>{loading ? 'Entrando...' : 'Entrar'}</Button>
         </form>
       </div>
@@ -178,12 +201,12 @@ const LoginScreen = ({ onLogin, onGoToRegister }) => {
   );
 };
 
-// --- VISTA ABUELO (CON CRONÓMETRO Y UI MEJORADA) ---
+// --- VISTA ABUELO ---
 const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, refresh }) => {
   const [activeMemory, setActiveMemory] = useState(null);
   const [puzzleState, setPuzzleState] = useState({ pieces: [], solved: false, selected: null });
   const [feedback, setFeedback] = useState(null);
-  const [timer, setTimer] = useState(0); // NUEVO: Estado del cronómetro
+  const [timer, setTimer] = useState(0); 
 
   // Efecto para el cronómetro
   useEffect(() => {
@@ -235,11 +258,19 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
 
   if (!activeMemory) {
     const userId = user.UserId || user.userId;
-    const pending = memories.filter(m => 
-        !m.completed && 
-        (m.imageUrl) && 
-        ((m.targetUserId || m.TargetUserId) === userId || m.targetUserId === null)
-    );
+    
+    // FILTRADO CORREGIDO: 
+    // 1. Muestra tareas pendientes.
+    // 2. Permite tareas asignadas al usuario (TargetUserId === userId).
+    // 3. Permite tareas huérfanas (TargetUserId === null) para compatibilidad.
+    // 4. YA NO FILTRA por 'imageUrl', así que las tareas sin foto aparecerán (con imagen dummy).
+    const pending = memories.filter(m => {
+        const targetId = m.targetUserId || m.TargetUserId;
+        const isAssignedToMe = targetId === userId;
+        const isUnassigned = !targetId; // null o undefined
+        
+        return !m.completed && (isAssignedToMe || isUnassigned);
+    });
 
     const displayName = (user.Name || user.name || "Abuelo").split(' ')[0];
 
@@ -259,12 +290,14 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
                 <button onClick={refresh} className="mt-2 text-sm underline text-red-800">Reintentar</button>
             </div>
           )}
-          {loading ? <div className="flex flex-col items-center justify-center mt-20 gap-4"><Loader className="animate-spin text-emerald-600" size={48}/><p className="text-slate-500">Cargando...</p></div> 
+
+          {loading ? <div className="flex flex-col items-center justify-center mt-20 gap-4"><Loader className="animate-spin text-emerald-600" size={48}/><p className="text-slate-500">Cargando actividades...</p></div> 
           : pending.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60"><Heart size={80} className="mb-4"/><p>¡Todo listo por hoy!</p></div>
           ) : pending.map(m => (
             <button key={m.id} onClick={() => { setActiveMemory(m); if(m.type === 'puzzle') initPuzzle(); }} 
               className="w-full bg-white p-5 rounded-3xl shadow-sm border-b-4 border-slate-200 flex items-center gap-5 active:scale-95 text-left">
+              {/* FALLBACK DE IMAGEN: Si imageUrl es null, usa placeholder */}
               <img src={m.imageUrl || 'https://placehold.co/150?text=Sin+Foto'} className="w-24 h-24 rounded-2xl object-cover bg-slate-200" alt="thumb"/>
               <div className="flex-1"><h3 className="font-bold text-2xl text-slate-800">{m.title}</h3></div>
               <PlayCircle size={40} className="text-emerald-500"/>
@@ -298,7 +331,7 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
       <div className="w-full max-w-[340px] aspect-square grid grid-cols-2 gap-2 p-3 bg-white rounded-2xl shadow-xl">
         {puzzleState.pieces.map((pieceVal, index) => {
           const x = (pieceVal % 2) * 100; const y = Math.floor(pieceVal / 2) * 100;
-          return <button key={index} onClick={() => handlePieceClick(index)} className={`relative w-full h-full rounded-xl overflow-hidden border-2 ${puzzleState.selected === index ? 'border-blue-500 scale-95' : 'border-slate-100'}`} style={{backgroundImage: `url(${activeMemory.imageUrl})`, backgroundSize: '200% 200%', backgroundPosition: `${x}% ${y}%`}} />;
+          return <button key={index} onClick={() => handlePieceClick(index)} className={`relative w-full h-full rounded-xl overflow-hidden border-2 ${puzzleState.selected === index ? 'border-blue-500 scale-95' : 'border-slate-100'}`} style={{backgroundImage: `url(${activeMemory.imageUrl || 'https://placehold.co/340?text=Puzzle'})`, backgroundSize: '200% 200%', backgroundPosition: `${x}% ${y}%`}} />;
         })}
       </div>
     </ActivityShell>
@@ -308,7 +341,7 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
     const options = activeMemory.options || ['1998', '2015', activeMemory.correctAnswer];
     return (
       <div className="flex flex-col h-full bg-amber-50">
-        <div className="h-[40%] relative"><img src={activeMemory.imageUrl || 'https://placehold.co/500?text=Sin+Foto'} className="w-full h-full object-cover"/><button onClick={() => setActiveMemory(null)} className="absolute top-4 left-4 p-4 bg-white/90 rounded-full shadow-lg"><ChevronLeft size={28}/></button><div className="absolute inset-0 bg-black/40 flex items-end p-6"><h2 className="text-white text-3xl font-bold">{activeMemory.question}</h2></div></div>
+        <div className="h-[40%] relative"><img src={activeMemory.imageUrl || 'https://placehold.co/500?text=Pregunta'} className="w-full h-full object-cover"/><button onClick={() => setActiveMemory(null)} className="absolute top-4 left-4 p-4 bg-white/90 rounded-full shadow-lg"><ChevronLeft size={28}/></button><div className="absolute inset-0 bg-black/40 flex items-end p-6"><h2 className="text-white text-3xl font-bold">{activeMemory.question}</h2></div></div>
         <div className="flex-1 bg-white -mt-8 rounded-t-[2.5rem] p-6 shadow-2xl relative z-10 flex flex-col justify-center gap-4">
           {options.map((opt, i) => (
             <Button key={i} variant="senior" onClick={() => { if(opt === activeMemory.correctAnswer) triggerSuccess(); else alert('Inténtalo de nuevo'); }}>{opt}</Button>
@@ -318,35 +351,19 @@ const SeniorView = ({ user, memories, onUpdateMemory, onLogout, loading, error, 
     );
   }
 
-  // --- VISTA DE DIARIO MEJORADA (CRONÓMETRO Y ESTILO) ---
   return (
     <ActivityShell title={activeMemory.title}>
       <div className="flex flex-col items-center justify-center w-full h-full gap-8">
-        
-        {/* Indicador de Grabación Animado */}
         <div className="relative">
             <div className="absolute inset-0 bg-red-200 rounded-full animate-ping opacity-75"></div>
-            <div className="relative w-40 h-40 bg-red-100 rounded-full flex items-center justify-center text-red-500 border-4 border-white shadow-xl">
-                <Mic size={64} />
-            </div>
+            <div className="relative w-40 h-40 bg-red-100 rounded-full flex items-center justify-center text-red-500 border-4 border-white shadow-xl"><Mic size={64} /></div>
         </div>
-
-        {/* Cronómetro */}
         <div className="text-center">
             <p className="text-4xl font-mono font-bold text-slate-700">{formatTime(timer)}</p>
-            <div className="flex items-center justify-center gap-2 mt-2">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-red-500 font-bold tracking-widest text-sm">GRABANDO</span>
-            </div>
+            <div className="flex items-center justify-center gap-2 mt-2"><div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div><span className="text-red-500 font-bold tracking-widest text-sm">GRABANDO</span></div>
         </div>
-
-        <p className="text-2xl text-slate-800 text-center px-6 font-medium leading-relaxed">
-            "{activeMemory.prompt}"
-        </p>
-
-        <div className="w-full px-6 mt-auto">
-            <Button variant="seniorPrimary" onClick={triggerSuccess}>Terminar Grabación</Button>
-        </div>
+        <p className="text-2xl text-slate-800 text-center px-6 font-medium leading-relaxed">"{activeMemory.prompt}"</p>
+        <div className="w-full px-6 mt-auto"><Button variant="seniorPrimary" onClick={triggerSuccess}>Terminar Grabación</Button></div>
       </div>
     </ActivityShell>
   );
