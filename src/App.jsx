@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 // --- CONFIGURACIÓN DE CONEXIÓN AWS ---
+// Versión: v1.1 - S3 Ready
 // ¡IMPORTANTE! Reemplaza la IP con la tuya (http://TU_IP_PUBLICA_AQUI:5000/api)
 const API_URL = 'http://3.138.69.143:5000/api'; 
 
