@@ -387,7 +387,7 @@ const FamilyView = ({ user, memories, notifications, onAddMemory, onLogout, load
         const result = await res.json();
         if(result.success) {
             setTab('feed');
-            onAddMemory(payload); // Trigger reload
+            onAddMemory({}); // Trigger reload
             setTitle(''); setQuestion(''); setAnswer(''); setMsg(''); setFile(null); setImgUrl('');// Limpiar
         } else {
             alert("Error al crear: " + (result.message || result.error));
@@ -485,7 +485,7 @@ export default function MemoriaVivaApp() {
       try {
           const res = await fetch(`${API_URL}/notifications/${familyId}`);
           const data = await res.json();
-          if(ArrayOf(data)) setNotifications(data);
+          if(Array.isArray(data)) setNotifications(data);
       } catch (err) { console.error(err); }
   }
 
